@@ -24,7 +24,7 @@ function registerComponent(exportedComponent: Component, shape?: typeof Shape) {
     if (!Object.prototype.hasOwnProperty.call(exportedComponent, 'shape')) {
       console.warn(
         `Component ${
-          exportedComponent.displayName || exportedComponent.name
+          (exportedComponent as any).displayName || (exportedComponent as any).name
         } is not linked to a shape.`,
       );
       return;

@@ -12,12 +12,9 @@
     "target": "es6",
     "jsx": "react",
     "moduleResolution": "node",
+    "typeRoots": ["../../node_modules/@types"],
     "types": ["node", "jest"],
-    "baseUrl": "./",
-    "paths": {
-      "@_linked/core": ["../core/src/index"],
-      "@_linked/core/*": ["../core/src/*"]
-    }
+    "baseUrl": "./"
   },
   "include": [
     "./src/**/*.ts",

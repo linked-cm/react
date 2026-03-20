@@ -10,6 +10,7 @@ export class LinkedComponentClass<
   P = {},
   S = any,
 > extends React.Component<P & LinkedComponentProps<ShapeClass>, S> {
+  declare props: Readonly<P & LinkedComponentProps<ShapeClass>> & Readonly<React.PropsWithChildren>;
   private _shape: ShapeClass;
 
   get sourceShape(): ShapeClass {

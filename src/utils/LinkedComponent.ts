@@ -1,29 +1,47 @@
 import {
   GetCustomObjectKeys,
-  GetQueryResponseType,
-  GetQueryShapeType,
   QResult,
   QueryController,
   QueryControllerProps,
   QueryResponseToResultType,
-  QueryWrapperObject,
-  SelectQueryFactory,
   ToQueryResultSet,
 } from '@_linked/core/queries/SelectQuery';
 import {Shape} from '@_linked/core/shapes/Shape';
+import {QueryBuilder} from '@_linked/core/queries/QueryBuilder';
+import {FieldSet} from '@_linked/core/queries/FieldSet';
 import {getQueryDispatch} from '@_linked/core/queries/queryDispatch';
 
-import React, {createElement, useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {LinkedStorage} from '@_linked/core/utils/LinkedStorage';
 import {DEFAULT_LIMIT} from '@_linked/core/utils/Package';
 import {ShapeSet} from '@_linked/core/collections/ShapeSet';
 import {isNodeReferenceValue, NodeReferenceValue} from '@_linked/core/utils/NodeReference';
 import {getShapeClass, hasSuperClass} from '@_linked/core/utils/ShapeClass';
 
-// Kept for parity with legacy source shape processing.
+/**
+ * Extract the Shape type parameter from a QueryBuilder.
+ */
+type GetQueryShapeType<Q> = Q extends QueryBuilder<infer S, any, any> ? S : never;
+
+/**
+ * Extract the query response type from a QueryBuilder or FieldSet.
+ * Falls through to Q itself if neither matches (preserves legacy behaviour).
+ */
+type GetQueryResponseType<Q> =
+  Q extends QueryBuilder<any, infer R, any> ? R :
+  Q extends FieldSet<infer R, any> ? R :
+  Q;
+
+/**
+ * A wrapper object mapping a single key to a QueryBuilder (used by linkedSetComponent).
+ */
+type QueryWrapperObject<ShapeType extends Shape = any> = {
+  [key: string]: QueryBuilder<ShapeType>;
+};
+
 type ProcessDataResultType<ShapeType extends Shape> = [
   typeof Shape,
-  SelectQueryFactory<ShapeType>,
+  QueryBuilder<ShapeType>,
 ];
 
 export type Component<P = any, ShapeType extends Shape = Shape> =
@@ -45,7 +63,7 @@ export interface LinkedComponent<
     P & LinkedComponentInputProps<ShapeType> & React.ComponentPropsWithRef<any>
   > {
   original?: LinkableComponent<P, ShapeType>;
-  query: SelectQueryFactory<any>;
+  query: QueryBuilder<any>;
   shape?: typeof Shape;
 }
 
@@ -59,7 +77,7 @@ export interface LinkedSetComponent<
       React.ComponentPropsWithRef<any>
   > {
   original?: LinkableSetComponent<P, ShapeType>;
-  query: SelectQueryFactory<any> | QueryWrapperObject<ShapeType>;
+  query: QueryBuilder<any> | QueryWrapperObject<ShapeType>;
   shape?: typeof Shape;
 }
 
@@ -108,8 +126,8 @@ interface LinkedComponentInputBaseProps extends React.PropsWithChildren {
 
 export type LinkedSetComponentFactoryFn = <
   QueryType extends
-    | SelectQueryFactory<any>
-    | {[key: string]: SelectQueryFactory<any>} = null,
+    | QueryBuilder<any>
+    | {[key: string]: QueryBuilder<any>} = null,
   CustomProps = {},
   ShapeType extends Shape = GetQueryShapeType<QueryType>,
   Res = ToQueryResultSet<QueryType>,
@@ -123,7 +141,7 @@ export type LinkedSetComponentFactoryFn = <
 ) => LinkedSetComponent<CustomProps, ShapeType, Res>;
 
 export type LinkedComponentFactoryFn = <
-  QueryType extends SelectQueryFactory<any> = null,
+  QueryType extends QueryBuilder<any> = null,
   CustomProps = {},
   ShapeType extends Shape = GetQueryShapeType<QueryType>,
   Response = GetQueryResponseType<QueryType>,
@@ -138,7 +156,7 @@ export function createLinkedComponentFn(
   registerComponent,
 ) {
   return function linkedComponent<
-    QueryType extends SelectQueryFactory<any> = null,
+    QueryType extends QueryBuilder<any> = null,
     CustomProps = {},
     ShapeType extends Shape = GetQueryShapeType<QueryType>,
     Res = GetQueryResponseType<QueryType>,
@@ -169,14 +187,12 @@ export function createLinkedComponentFn(
           const loadData = () => {
             const sourceId = linkedProps.source?.id;
             if (!loadingData || loadingData !== sourceId) {
-              let requestQuery = (
-                actualQuery as SelectQueryFactory<any>
-              ).clone();
-              if (linkedProps.source) {
-                requestQuery.setSubject(linkedProps.source);
-              }
+              // QueryBuilder is immutable — chain calls produce new instances.
+              let requestQuery = linkedProps.source
+                ? actualQuery.for(linkedProps.source)
+                : actualQuery;
 
-              setLoadingData(sourceId || requestQuery.subject?.id);
+              setLoadingData(sourceId || requestQuery.toJSON().subject);
               getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
                 setQueryResult(result);
                 setLoadingData(null);
@@ -188,7 +204,7 @@ export function createLinkedComponentFn(
             }
           };
 
-          let sourceIsValidQResult = isValidQResult(props.of, query);
+          let sourceIsValidQResult = isValidQResult(props.of, actualQuery);
 
           if (queryResult || sourceIsValidQResult) {
             linkedProps = Object.assign(linkedProps, queryResult || props.of);
@@ -209,7 +225,7 @@ export function createLinkedComponentFn(
             [queryResult, props.of],
           );
 
-          if (!linkedProps.source && !actualQuery.subject) {
+          if (!linkedProps.source && !actualQuery.toJSON().subject) {
             console.warn(
               'This component requires a source to be provided (use the property "of"): ' +
                 functionalComponent.name,
@@ -263,8 +279,8 @@ export function createLinkedSetComponentFn(
 ) {
   return function linkedSetComponent<
     QueryType extends
-      | SelectQueryFactory<any>
-      | {[key: string]: SelectQueryFactory<any>} = null,
+      | QueryBuilder<any>
+      | {[key: string]: QueryBuilder<any>} = null,
     CustomProps = {},
     ShapeType extends Shape = GetQueryShapeType<QueryType>,
     Res = ToQueryResultSet<QueryType>,
@@ -291,7 +307,7 @@ export function createLinkedSetComponentFn(
           any
         >(props, shapeClass, functionalComponent);
 
-        let defaultLimit = actualQuery.getLimit() || DEFAULT_LIMIT;
+        let defaultLimit = actualQuery.toJSON().limit || DEFAULT_LIMIT;
         let [limit, setLimit] = useState<number>(defaultLimit);
         let [offset, setOffset] = useState<number>(0);
 
@@ -303,7 +319,7 @@ export function createLinkedSetComponentFn(
           Array.isArray(props.of) &&
           props.of.length > 0 &&
           typeof (props.of[0] as QResult<any>)?.id === 'string' &&
-          actualQuery.isValidSetResult(props.of as QResult<any>[]);
+          isValidSetQResult(props.of as QResult<any>[], actualQuery);
 
         if (queryResult || sourceIsValidQResult) {
           let dataResult;
@@ -319,7 +335,7 @@ export function createLinkedSetComponentFn(
               dataResult = props.of;
             }
           }
-          if (query instanceof SelectQueryFactory) {
+          if (query instanceof QueryBuilder) {
             linkedProps = Object.assign(linkedProps, {
               linkedData: dataResult,
             });
@@ -348,14 +364,18 @@ export function createLinkedSetComponentFn(
 
         useEffect(() => {
           if (usingStorage && !sourceIsValidQResult) {
-            let requestQuery = (actualQuery as SelectQueryFactory<any>).clone();
-            requestQuery.setSubject(linkedProps.sources);
-
+            // QueryBuilder is immutable — chain calls to set subjects, limit, offset.
+            let requestQuery: QueryBuilder<any> = actualQuery;
+            if (linkedProps.sources) {
+              requestQuery = requestQuery.forAll(
+                Array.from(linkedProps.sources).map((s: Shape) => ({id: s.id})),
+              );
+            }
             if (limit) {
-              requestQuery.setLimit(limit);
+              requestQuery = requestQuery.limit(limit);
             }
             if (offset) {
-              requestQuery.setOffset(offset);
+              requestQuery = requestQuery.offset(offset);
             }
 
             getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
@@ -420,15 +440,16 @@ function getLinkedComponentProps<ShapeType extends Shape, P>(
 }
 
 function processQuery<ShapeType extends Shape>(
-  requiredData: SelectQueryFactory<ShapeType> | QueryWrapperObject<ShapeType>,
+  requiredData: QueryBuilder<ShapeType> | QueryWrapperObject<ShapeType>,
   setComponent: boolean = false,
 ): ProcessDataResultType<ShapeType> {
   let shapeClass: typeof Shape;
-  let query: SelectQueryFactory<ShapeType>;
+  let query: QueryBuilder<ShapeType>;
 
-  if (requiredData instanceof SelectQueryFactory) {
+  if (requiredData instanceof QueryBuilder) {
     query = requiredData;
-    shapeClass = requiredData.shape as any;
+    // QueryBuilder._shape is private; extract shape IRI via toJSON and resolve the class.
+    shapeClass = getShapeClass(requiredData.toJSON().shape) as unknown as typeof Shape;
   } else if (typeof requiredData === 'object' && setComponent) {
     if (Object.keys(requiredData).length > 1) {
       throw new Error(
@@ -436,18 +457,18 @@ function processQuery<ShapeType extends Shape>(
       );
     }
     for (let key in requiredData) {
-      if (requiredData[key] instanceof SelectQueryFactory) {
-        shapeClass = requiredData[key].shape as any;
+      if (requiredData[key] instanceof QueryBuilder) {
+        shapeClass = getShapeClass(requiredData[key].toJSON().shape) as unknown as typeof Shape;
         query = requiredData[key];
       } else {
         throw new Error(
-          'Unknown value type for query object. Keep to this format: {propName: Shape.query(s => ...)}',
+          'Unknown value type for query object. Keep to this format: {propName: Shape.select(s => ...)}',
         );
       }
     }
   } else {
     throw new Error(
-      'Unknown data query type. Expected a LinkedQuery (from Shape.query()) or an object with 1 key whose value is a LinkedQuery',
+      'Unknown data query type. Expected a QueryBuilder (from Shape.select()) or an object with 1 key whose value is a QueryBuilder',
     );
   }
   return [shapeClass, query];
@@ -513,11 +534,22 @@ export function getSourceFromInputProps(props, shapeClass) {
   return input;
 }
 
-function isValidQResult(of, query) {
-  return (
-    typeof (of as QResult<any>)?.id === 'string' &&
-    query.isValidResult(of as QResult<any>)
-  );
+/**
+ * Check if a QResult has all the fields the query selects.
+ */
+function isValidQResult(of: any, query: QueryBuilder<any>): boolean {
+  if (typeof (of as QResult<any>)?.id !== 'string') return false;
+  const fieldSet = query.fields();
+  if (!fieldSet) return false;
+  const labels = fieldSet.labels();
+  return labels.every((label) => label in of);
+}
+
+/**
+ * Check if an array of QResults all have the fields the query selects.
+ */
+function isValidSetQResult(qResults: QResult<any>[], query: QueryBuilder<any>): boolean {
+  return qResults.every((qResult) => isValidQResult(qResult, query));
 }
 
 function createLoadingSpinner() {
