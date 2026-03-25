@@ -514,7 +514,13 @@ function getLinkedSetComponentProps<ShapeType extends Shape, P>(
 }
 
 export function getSourceFromInputProps(props, shapeClass) {
-  const input = props?.of;
+  let input = props?.of;
+
+  // Unwrap single-element arrays (e.g. from preloadFor on maxCount:1 properties
+  // where the result mapper returns an array with one item).
+  if (Array.isArray(input) && input.length === 1) {
+    input = input[0];
+  }
 
   if (input instanceof Shape) {
     if (
