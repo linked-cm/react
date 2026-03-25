@@ -5,7 +5,7 @@ import {linkedComponent, linkedSetComponent, linkedShape} from '../package.js';
 import {Shape} from '@_linked/core/shapes/Shape';
 import {literalProperty} from '@_linked/core/shapes/SHACL';
 import {LinkedStorage} from '@_linked/core/utils/LinkedStorage';
-import {SelectQueryFactory} from '@_linked/core/queries/SelectQuery';
+import {QueryBuilder} from '@_linked/core/queries/QueryBuilder';
 import {ShapeSet} from '@_linked/core/collections/ShapeSet';
 import {getSourceFromInputProps} from '../utils/LinkedComponent.js';
 import {useStyles} from '../utils/Hooks.js';
@@ -63,9 +63,13 @@ class BrokenLinkedClass extends LinkedComponentClass<Person> {
   }
 }
 
-class QueryParserStub {
+/**
+ * A mock IQuadStore that returns configurable results.
+ * Tracks calls for assertions.
+ */
+class MockStore {
   calls: Array<{offset?: number; limit?: number; singleResult?: boolean}> = [];
-  private singleResult = {id: 'urn:test:gap:p1', name: 'Semmy'};
+  private singleResult: any = {id: 'urn:test:gap:p1', name: 'Semmy'};
   private setResult = [
     {id: 'urn:test:gap:p1', name: 'Semmy'},
     {id: 'urn:test:gap:p2', name: 'Moa'},
@@ -83,42 +87,32 @@ class QueryParserStub {
     this.queue.push(resultPromise);
   }
 
-  async selectQuery<ResultType>(query: SelectQueryFactory<Shape>) {
-    const request = query.getQueryObject();
+  async selectQuery(query: any): Promise<any> {
     this.calls.push({
-      offset: request.offset,
-      limit: request.limit,
-      singleResult: request.singleResult,
+      offset: query.offset,
+      limit: query.limit,
+      singleResult: query.singleResult,
     });
 
     if (this.queue.length > 0) {
-      return this.queue.shift() as Promise<ResultType>;
+      return this.queue.shift();
     }
 
-    if (request.singleResult) {
-      return this.singleResult as ResultType;
+    if (query.singleResult) {
+      return this.singleResult;
     }
 
-    const offset = request.offset || 0;
-    const limit = request.limit || this.setResult.length;
-    return this.setResult.slice(offset, offset + limit) as ResultType;
+    const offset = query.offset || 0;
+    const limit = query.limit || this.setResult.length;
+    return this.setResult.slice(offset, offset + limit);
   }
 }
 
-let parser: QueryParserStub;
+let store: MockStore;
 
 beforeEach(() => {
-  parser = new QueryParserStub();
-  Person.queryParser = parser as any;
-  Dog.queryParser = parser as any;
-  Cat.queryParser = parser as any;
-
-  LinkedStorage.setDefaultStore({
-    init() {},
-    async selectQuery() {
-      return [];
-    },
-  } as any);
+  store = new MockStore();
+  LinkedStorage.setDefaultStore(store as any);
 });
 
 afterEach(() => {
@@ -128,10 +122,10 @@ afterEach(() => {
 describe('React component behavior', () => {
   test('shows loader before linkedComponent query resolves', async () => {
     const deferred = createDeferred<any>();
-    parser.queueResult(deferred.promise);
+    store.queueResult(deferred.promise);
 
     const Card = linkedComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({name}) => <div>{name}</div>,
     );
 
@@ -151,10 +145,10 @@ describe('React component behavior', () => {
 
   test('shows loader before linkedSetComponent query resolves', async () => {
     const deferred = createDeferred<any>();
-    parser.queueResult(deferred.promise);
+    store.queueResult(deferred.promise);
 
     const NameList = linkedSetComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({linkedData = []}) => (
         <ul>
           {linkedData.map((item) => (
@@ -184,17 +178,17 @@ describe('React component behavior', () => {
 
   test('_refresh() refetches data and rerenders', async () => {
     let singleValue = 'Semmy';
-    parser.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
+    store.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
 
     const Card = linkedComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({name, _refresh}) => (
         <div>
           <span>{name}</span>
           <button
             onClick={() => {
               singleValue = 'Moa';
-              parser.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
+              store.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
               _refresh();
             }}
           >
@@ -216,11 +210,11 @@ describe('React component behavior', () => {
       expect(screen.getByText('Moa')).toBeTruthy();
     });
 
-    expect(parser.calls.length).toBeGreaterThanOrEqual(2);
+    expect(store.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   test('_refresh(updatedProps) patches query-result props without refetch', async () => {
-    const singleNameQuery = Person.query((p) => p.name);
+    const singleNameQuery = Person.select((p) => p.name);
     const Card = linkedComponent<typeof singleNameQuery, {title: string}>(
       singleNameQuery,
       ({name, _refresh, title}) => (
@@ -238,7 +232,7 @@ describe('React component behavior', () => {
       expect(screen.getByText('Semmy')).toBeTruthy();
     });
 
-    const callsBeforePatch = parser.calls.length;
+    const callsBeforePatch = store.calls.length;
     fireEvent.click(screen.getByText('patch'));
 
     await waitFor(() => {
@@ -246,14 +240,14 @@ describe('React component behavior', () => {
       expect(screen.getByText('CustomTitle')).toBeTruthy();
     });
 
-    expect(parser.calls.length).toBe(callsBeforePatch);
+    expect(store.calls.length).toBe(callsBeforePatch);
   });
 
   test('warns and renders null when linkedComponent has no source and no bound subject', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const Card = linkedComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({name}) => <div>{name}</div>,
     );
 
@@ -268,7 +262,7 @@ describe('React component behavior', () => {
   test('throws on invalid linkedSetComponent input prop type', () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const NameList = linkedSetComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({linkedData = []}) => (
         <ul>
           {linkedData.map((item) => (
@@ -285,7 +279,7 @@ describe('React component behavior', () => {
   });
 
   test('throws on invalid query-wrapper object formats', () => {
-    const query = Person.query((p) => p.name);
+    const query = Person.select((p) => p.name);
 
     expect(() =>
       linkedSetComponent({a: query, b: query} as any, () => null),
@@ -300,49 +294,21 @@ describe('React component behavior', () => {
     ).toThrow('Unknown data query type');
   });
 
-  test('throws when _refresh() tries to load data without a configured parser', async () => {
-    const previousDefaultParser = Shape.queryParser;
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    (Shape as any).queryParser = undefined;
-    (Person as any).queryParser = undefined;
+  test('rejects when selectQuery is called without a configured store', async () => {
+    // Setting null store means selectQuery will reject
+    LinkedStorage.setDefaultStore(null as any);
 
-    const Card = linkedComponent(
-      Person.query((p) => p.name),
-      ({name, _refresh}) => (
-        <div>
-          <span>{name}</span>
-          <button onClick={() => _refresh()}>refresh</button>
-        </div>
-      ),
-    );
+    await expect(
+      LinkedStorage.selectQuery({} as any),
+    ).rejects.toThrow('No query store configured');
 
-    render(<Card of={{id: 'urn:test:gap:p1', name: 'Semmy'} as any} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Semmy')).toBeTruthy();
-    });
-
-    let capturedError: Error | null = null;
-    const onWindowError = (event: ErrorEvent) => {
-      capturedError = event.error;
-      event.preventDefault();
-    };
-    window.addEventListener('error', onWindowError);
-
-    fireEvent.click(screen.getByText('refresh'));
-
-    expect(capturedError?.message).toContain('No query parser configured');
-
-    window.removeEventListener('error', onWindowError);
-
-    (Shape as any).queryParser = previousDefaultParser;
-    (Person as any).queryParser = parser as any;
+    // Restore store for subsequent tests
+    LinkedStorage.setDefaultStore(store as any);
   });
 
   test('linkedSetComponent query controller methods update paging', async () => {
     let controller: any;
-    const pagedQuery = Person.query((p) => p.name);
-    pagedQuery.setLimit(2);
+    const pagedQuery = Person.select((p) => p.name).limit(2);
     const NameList = linkedSetComponent(
       pagedQuery,
       ({linkedData = [], query}) => {
@@ -420,7 +386,7 @@ describe('React component behavior', () => {
   });
 
   test('linked components expose shape/query metadata for package registration usage', () => {
-    const query = Person.query((p) => p.name);
+    const query = Person.select((p) => p.name);
     const Card = linkedComponent(query, ({name}) => <div>{name}</div>);
     const SetList = linkedSetComponent(query, ({linkedData = []}) => (
       <ul>
@@ -437,8 +403,7 @@ describe('React component behavior', () => {
   });
 
   test('linked set query supports array QResult input and applies client-side slicing', async () => {
-    const pagedQuery = Person.query((p) => p.name);
-    pagedQuery.setLimit(2);
+    const pagedQuery = Person.select((p) => p.name).limit(2);
     const NameList = linkedSetComponent(
       pagedQuery,
       ({linkedData = [], query}) => (
@@ -474,13 +439,13 @@ describe('React component behavior', () => {
       expect(screen.getByText('Quinn')).toBeTruthy();
     });
 
-    // With valid prefetched results, parser should not execute requests.
-    expect(parser.calls.length).toBe(0);
+    // With valid prefetched results, store should not execute requests.
+    expect(store.calls.length).toBe(0);
   });
 
   test('linked set accepts ShapeSet as input', async () => {
     const NameList = linkedSetComponent(
-      Person.query((p) => p.name),
+      Person.select((p) => p.name),
       ({linkedData = []}) => (
         <ul>
           {linkedData.map((item) => (
