@@ -194,7 +194,13 @@ export function createLinkedComponentFn(
 
               setLoadingData(sourceId || requestQuery.toJSON().subject);
               getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
-                setQueryResult(result);
+                // Use empty object when result is null/undefined so the component
+                // renders with default values instead of showing spinner forever.
+                setQueryResult(result ?? {});
+                setLoadingData(null);
+              }).catch((err) => {
+                console.error('linkedComponent loadData failed:', err);
+                setQueryResult({});
                 setLoadingData(null);
               });
             } else {
@@ -225,7 +231,15 @@ export function createLinkedComponentFn(
             [queryResult, props.of],
           );
 
-          if (!linkedProps.source && !actualQuery.toJSON().subject) {
+          // Resolve the current subject ID — for pending contexts this reads
+          // from the live global Map, so it updates when auth sets the context.
+          const resolvedSubjectId = actualQuery.toJSON().subject;
+
+          if (!linkedProps.source && !resolvedSubjectId) {
+            if (actualQuery.hasPendingContext()) {
+              // Subject will resolve after auth — show spinner until then.
+              return createLoadingSpinner();
+            }
             console.warn(
               'This component requires a source to be provided (use the property "of"): ' +
                 functionalComponent.name,
@@ -243,7 +257,7 @@ export function createLinkedComponentFn(
             if (usingStorage && !sourceIsValidQResult) {
               loadData();
             }
-          }, [linkedProps.source?.id]);
+          }, [linkedProps.source?.id, resolvedSubjectId]);
 
           let dataIsLoaded =
             queryResult || !usingStorage || sourceIsValidQResult;
