@@ -3,7 +3,7 @@ import React from 'react';
 import {render, cleanup, act} from '@testing-library/react';
 import {cl} from '../utils/ClassNames.js';
 import {useQueryContext} from '../utils/useQueryContext.js';
-import {getQueryContext, setQueryContext} from '@_linked/core/queries/QueryContext';
+import {getQueryContext, setQueryContext, PendingQueryContext} from '@_linked/core/queries/QueryContext';
 import {Shape} from '@_linked/core/shapes/Shape';
 import {linkedShape} from '../package.js';
 
@@ -77,16 +77,14 @@ describe('useQueryContext', () => {
   });
 
   test('does not set context when value is falsy', async () => {
-    // Clear any previous context
-    setQueryContext('emptyCtx', null as any);
-
     await act(async () => {
       render(<ContextSetter name="emptyCtx" value={null} />);
     });
 
     const ctx = getQueryContext('emptyCtx');
-    // Should still be null since we passed null value
-    expect(ctx).toBeNull();
+    // Should return a PendingQueryContext (not null) whose id is undefined
+    expect(ctx).toBeInstanceOf(PendingQueryContext);
+    expect(ctx.id).toBeUndefined();
   });
 
   test('updates context when value changes', async () => {
@@ -105,5 +103,70 @@ describe('useQueryContext', () => {
 
     const ctx = getQueryContext<TestPerson>('changing');
     expect(ctx).not.toBeNull();
+  });
+});
+
+// ── PendingQueryContext (lazy resolution) ──
+
+describe('PendingQueryContext', () => {
+  afterEach(() => {
+    cleanup();
+    // Clear contexts between tests
+    setQueryContext('lazyUser', null as any);
+  });
+
+  test('getQueryContext returns PendingQueryContext when context is not yet set', () => {
+    const ctx = getQueryContext('nonExistent');
+    expect(ctx).toBeInstanceOf(PendingQueryContext);
+    expect((ctx as any).contextName).toBe('nonExistent');
+  });
+
+  test('PendingQueryContext.id is undefined when context is not set', () => {
+    const ctx = getQueryContext('lazyUser');
+    expect(ctx.id).toBeUndefined();
+  });
+
+  test('PendingQueryContext.id resolves after setQueryContext is called', () => {
+    // Get a pending reference BEFORE setting the context
+    const ctx = getQueryContext('lazyUser');
+    expect(ctx.id).toBeUndefined();
+
+    // Now set the context (simulates what useAuth does after login)
+    setQueryContext('lazyUser', {id: 'urn:test:user:42'}, TestPerson);
+
+    // The same reference should now resolve to the ID
+    expect(ctx.id).toBe('urn:test:user:42');
+  });
+
+  test('getQueryContext returns resolved value (not PendingQueryContext) after context is set', () => {
+    setQueryContext('lazyUser', {id: 'urn:test:user:1'}, TestPerson);
+
+    const ctx = getQueryContext('lazyUser');
+    // Should return the actual QueryShape, not a PendingQueryContext
+    expect(ctx).not.toBeInstanceOf(PendingQueryContext);
+    expect(ctx.id).toBe('urn:test:user:1');
+  });
+
+  test('PendingQueryContext.id updates when context value changes', () => {
+    const ctx = getQueryContext('lazyUser');
+    expect(ctx.id).toBeUndefined();
+
+    // Set to first user
+    setQueryContext('lazyUser', {id: 'urn:test:user:1'}, TestPerson);
+    expect(ctx.id).toBe('urn:test:user:1');
+
+    // Update to second user
+    setQueryContext('lazyUser', {id: 'urn:test:user:2'}, TestPerson);
+    expect(ctx.id).toBe('urn:test:user:2');
+  });
+
+  test('multiple PendingQueryContext instances for same name all resolve', () => {
+    const ctx1 = getQueryContext('lazyUser');
+    const ctx2 = getQueryContext('lazyUser');
+
+    setQueryContext('lazyUser', {id: 'urn:test:user:99'}, TestPerson);
+
+    expect(ctx1.id).toBe('urn:test:user:99');
+    expect(ctx2.id).toBe('urn:test:user:99');
   });
 });

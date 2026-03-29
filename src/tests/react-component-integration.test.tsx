@@ -27,6 +27,7 @@ import {
   deleteTestDataset,
   loadTestData,
   clearAllData,
+  FUSEKI_BASE_URL,
 } from '@_linked/core/test-helpers/fuseki-test-store';
 import {FusekiStore} from '@_linked/core/test-helpers/FusekiStore';
 import {setQueryContext} from '@_linked/core/queries/QueryContext';
@@ -91,7 +92,7 @@ beforeAll(async () => {
   }
 
   // Set up store
-  const store = new FusekiStore('http://localhost:3030', 'nashville-test');
+  const store = new FusekiStore(FUSEKI_BASE_URL, 'nashville-test');
   LinkedStorage.setDefaultStore(store);
 
   // Set up query context
