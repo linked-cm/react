@@ -2,6 +2,7 @@
   "name": "@_linked/react",
   "version": "1.1.0",
   "license": "MIT",
+  "linkedPackage": true,
   "description": "React bindings for @_linked/core",
   "repository": {
     "type": "git",
