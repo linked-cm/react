@@ -64,7 +64,7 @@ class BrokenLinkedClass extends LinkedComponentClass<Person> {
 }
 
 /**
- * A mock IQuadStore that returns configurable results.
+ * A mock IDataset that returns configurable results.
  * Tracks calls for assertions.
  */
 class MockStore {
