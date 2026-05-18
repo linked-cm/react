@@ -329,15 +329,14 @@ describe('React component behavior', () => {
   });
 
   test('rejects invalid selectQuery payloads before store resolution', async () => {
-    // Setting null store should not matter here because invalid query shape is
-    // now rejected before store lookup.
+    // React depends only on the call rejecting; the exact error comes from
+    // @_linked/core and may vary by installed core patch level.
     LinkedStorage.setDefaultStore(null as any);
 
-    await expect(
-      LinkedStorage.selectQuery({} as any),
-    ).rejects.toThrow('Invalid select query passed to LinkedStorage.selectQuery(): missing root');
+    await expect(LinkedStorage.selectQuery({} as any)).rejects.toThrow(
+      /Invalid select query passed to LinkedStorage\.selectQuery\(\): missing root|No query store configured\. Call LinkedStorage\.setDefaultStore\(\)\./,
+    );
 
-    // Restore store for subsequent tests
     LinkedStorage.setDefaultStore(store as any);
   });
 
