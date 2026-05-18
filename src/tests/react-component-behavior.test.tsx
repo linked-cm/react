@@ -112,7 +112,7 @@ let store: MockStore;
 
 beforeEach(() => {
   store = new MockStore();
-  LinkedStorage.setDefaultStore(store as any);
+  LinkedStorage.setDefaultDataset(store as any);
 });
 
 afterEach(() => {
@@ -296,14 +296,14 @@ describe('React component behavior', () => {
 
   test('rejects when selectQuery is called without a configured store', async () => {
     // Setting null store means selectQuery will reject
-    LinkedStorage.setDefaultStore(null as any);
+    LinkedStorage.setDefaultDataset(null as any);
 
     await expect(
       LinkedStorage.selectQuery({} as any),
     ).rejects.toThrow('No query store configured');
 
     // Restore store for subsequent tests
-    LinkedStorage.setDefaultStore(store as any);
+    LinkedStorage.setDefaultDataset(store as any);
   });
 
   test('linkedSetComponent query controller methods update paging', async () => {
