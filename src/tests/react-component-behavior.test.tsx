@@ -176,6 +176,40 @@ describe('React component behavior', () => {
     });
   });
 
+  test('linkedSetComponent handles rejected query execution without hanging', async () => {
+    const deferred = Promise.reject(new Error('boom'));
+    deferred.catch(() => {});
+    store.queueResult(deferred);
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const NameList = linkedSetComponent(
+      Person.select((p) => p.name),
+      ({linkedData = []}) => (
+        <ul aria-label="names">
+          {linkedData.map((item) => (
+            <li key={item.id}>{item.name}</li>
+          ))}
+        </ul>
+      ),
+    );
+
+    render(<NameList />);
+
+    expect(screen.getByRole('status', {name: 'Loading'})).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('names')).toBeTruthy();
+    });
+
+    expect(screen.queryByRole('status', {name: 'Loading'})).toBeNull();
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      'linkedSetComponent loadData failed:',
+      expect.any(Error),
+    );
+  });
+
   test('_refresh() refetches data and rerenders', async () => {
     let singleValue = 'Semmy';
     store.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
@@ -294,15 +328,15 @@ describe('React component behavior', () => {
     ).toThrow('Unknown data query type');
   });
 
-  test('rejects when selectQuery is called without a configured store', async () => {
-    // Setting null store means selectQuery will reject
+  test('rejects invalid selectQuery payloads before store resolution', async () => {
+    // React depends only on the call rejecting; the exact error comes from
+    // @_linked/core and may vary by installed core patch level.
     LinkedStorage.setDefaultStore(null as any);
 
-    await expect(
-      LinkedStorage.selectQuery({} as any),
-    ).rejects.toThrow('No query store configured');
+    await expect(LinkedStorage.selectQuery({} as any)).rejects.toThrow(
+      /Invalid select query passed to LinkedStorage\.selectQuery\(\): missing root|No query store configured\. Call LinkedStorage\.setDefaultStore\(\)\./,
+    );
 
-    // Restore store for subsequent tests
     LinkedStorage.setDefaultStore(store as any);
   });
 

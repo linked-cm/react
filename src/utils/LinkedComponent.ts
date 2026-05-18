@@ -9,8 +9,6 @@ import {
 import {Shape} from '@_linked/core/shapes/Shape';
 import {QueryBuilder} from '@_linked/core/queries/QueryBuilder';
 import {FieldSet} from '@_linked/core/queries/FieldSet';
-import {getQueryDispatch} from '@_linked/core/queries/queryDispatch';
-
 import React, {useCallback, useEffect, useState} from 'react';
 import {LinkedStorage} from '@_linked/core/utils/LinkedStorage';
 import {DEFAULT_LIMIT} from '@_linked/core/utils/Package';
@@ -193,9 +191,10 @@ export function createLinkedComponentFn(
                 : actualQuery;
 
               setLoadingData(sourceId || requestQuery.toJSON().subject);
-              getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
-                // Use empty object when result is null/undefined so the component
-                // renders with default values instead of showing spinner forever.
+              requestQuery.exec().then((result) => {
+                // QueryBuilder.exec() returns null while pending auth/query context
+                // is unresolved; keep the previous fallback so linked components
+                // do not send malformed backend queries or spin forever.
                 setQueryResult(result ?? {});
                 setLoadingData(null);
               }).catch((err) => {
@@ -392,8 +391,13 @@ export function createLinkedSetComponentFn(
               requestQuery = requestQuery.offset(offset);
             }
 
-            getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
-              setQueryResult(result);
+            requestQuery.exec().then((result) => {
+              // Keep set-style linked components stable when execution is skipped
+              // during pending auth/query context hydration.
+              setQueryResult(result ?? []);
+            }).catch((err) => {
+              console.error('linkedSetComponent loadData failed:', err);
+              setQueryResult([]);
             });
           }
         }, [props.of, limit, offset]);
