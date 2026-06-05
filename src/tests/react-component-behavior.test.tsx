@@ -302,7 +302,7 @@ describe('React component behavior', () => {
 
     await expect(
       LinkedStorage.selectQuery({root: {}} as any),
-    ).rejects.toThrow('No query store configured');
+    ).rejects.toThrow('No query dataset configured');
 
     // Restore store for subsequent tests
     LinkedStorage.setDefaultDataset(store as any);
