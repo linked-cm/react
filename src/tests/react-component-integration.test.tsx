@@ -93,7 +93,7 @@ beforeAll(async () => {
 
   // Set up store
   const store = new FusekiStore(FUSEKI_BASE_URL, 'nashville-test');
-  LinkedStorage.setDefaultStore(store);
+  LinkedStorage.setDefaultDataset(store);
 
   // Set up query context
   setQueryContext('user', {id: p3Uri}, Person);

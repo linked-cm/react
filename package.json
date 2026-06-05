@@ -4,6 +4,10 @@
   "license": "MIT",
   "linkedPackage": true,
   "description": "React bindings for @_linked/core",
+  "sideEffects": [
+    "./lib/cjs/package.js",
+    "./lib/esm/package.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Semantu/linked-react.git"
