@@ -1,5 +1,5 @@
 import {CoreSet} from '@_linked/core/collections/CoreSet';
-import {linkedPackage} from '@_linked/core/utils/Package';
+import {linkedPackage as coreLinkedPackage} from '@_linked/core/utils/Package';
 import {Shape} from '@_linked/core/shapes/Shape';
 import {
   Component,
@@ -17,7 +17,7 @@ const {
   registerPackageModule,
   packageExports,
   getPackageShape,
-} = linkedPackage('@_linked/react');
+} = coreLinkedPackage('@_linked/react');
 
 function registerComponent(exportedComponent: Component, shape?: typeof Shape) {
   if (!shape) {
@@ -48,6 +48,13 @@ const linkedSetComponent = createLinkedSetComponentFn(
   registerPackageExport,
   registerComponent,
 );
+export const linkedPackage = (packageName) => {
+  return {
+    linkedComponent,
+    linkedSetComponent,
+    ...linkedPackage(packageName)
+  }
+}
 
 export {
   linkedComponent,

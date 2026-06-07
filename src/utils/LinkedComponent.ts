@@ -84,6 +84,51 @@ export interface LinkedSetComponent<
 export type LinkableComponent<P, ShapeType extends Shape = Shape> = React.FC<
   P & LinkedComponentProps<ShapeType>
 >;
+
+/**
+ * Options accepted by both `linkedComponent` and `linkedSetComponent` at
+ * definition time (3rd positional arg) and inside the config-object form.
+ * `loader` replaces the framework's default loading element; `errorElement`
+ * replaces the default error element. Pass the sentinel `'rethrow'` for
+ * `errorElement` to let the error propagate to an external `<ErrorBoundary>`.
+ */
+export interface LinkedComponentOptions {
+  loader?: React.ReactElement;
+  errorElement?: React.ReactElement | 'rethrow';
+}
+
+/**
+ * Config-object form of the factory:
+ *   linkedComponent({ query, component, loader, errorElement });
+ */
+export interface LinkedComponentConfig<Q, P, ShapeType extends Shape = Shape>
+  extends LinkedComponentOptions {
+  query: Q;
+  component: LinkableComponent<P, ShapeType>;
+}
+
+export interface LinkedSetComponentConfig<
+  Q,
+  P,
+  ShapeType extends Shape = Shape,
+> extends LinkedComponentOptions {
+  query: Q;
+  component: LinkableSetComponent<P, ShapeType>;
+}
+
+/**
+ * App-global override for loader and errorElement. Setting either of these
+ * applies to every `linkedComponent` / `linkedSetComponent` that doesn't
+ * specify its own. Resolution order:
+ *   instance prop > definition options > LinkedComponentDefaults > built-in
+ */
+export const LinkedComponentDefaults: {
+  loader: React.ReactElement | undefined;
+  errorElement: React.ReactElement | 'rethrow' | undefined;
+} = {
+  loader: undefined,
+  errorElement: undefined,
+};
 export type LinkableSetComponent<
   P,
   ShapeType extends Shape = Shape,
@@ -122,6 +167,14 @@ export interface LinkedComponentInputProps<ShapeType extends Shape = Shape>
 interface LinkedComponentInputBaseProps extends React.PropsWithChildren {
   className?: string | string[];
   style?: React.CSSProperties;
+  // Per-instance override of the loading element. Falls through to the
+  // factory's `options.loader`, then `LinkedComponentDefaults.loader`,
+  // then the built-in `<svg class="ld-loader" />`.
+  loader?: React.ReactElement;
+  // Per-instance override of the error element shown when the query fails.
+  // Pass the sentinel `'rethrow'` to skip the internal error boundary and
+  // let an external `<ErrorBoundary>` catch the error.
+  errorElement?: React.ReactElement | 'rethrow';
 }
 
 export type LinkedSetComponentFactoryFn = <
@@ -155,7 +208,7 @@ export function createLinkedComponentFn(
   registerPackageExport,
   registerComponent,
 ) {
-  return function linkedComponent<
+  function linkedComponent<
     QueryType extends QueryBuilder<any> = null,
     CustomProps = {},
     ShapeType extends Shape = GetQueryShapeType<QueryType>,
@@ -163,11 +216,55 @@ export function createLinkedComponentFn(
   >(
     query: QueryType,
     functionalComponent: LinkableComponent<
-      CustomProps &
-        QueryResponseToResultType<Res, ShapeType>,
+      CustomProps & QueryResponseToResultType<Res, ShapeType>,
       ShapeType
     >,
+  ): LinkedComponent<CustomProps, ShapeType, Res>;
+  function linkedComponent<
+    QueryType extends QueryBuilder<any> = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = GetQueryResponseType<QueryType>,
+  >(
+    query: QueryType,
+    functionalComponent: LinkableComponent<
+      CustomProps & QueryResponseToResultType<Res, ShapeType>,
+      ShapeType
+    >,
+    options: LinkedComponentOptions,
+  ): LinkedComponent<CustomProps, ShapeType, Res>;
+  function linkedComponent<
+    QueryType extends QueryBuilder<any> = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = GetQueryResponseType<QueryType>,
+  >(
+    config: LinkedComponentConfig<
+      QueryType,
+      CustomProps & QueryResponseToResultType<Res, ShapeType>,
+      ShapeType
+    >,
+  ): LinkedComponent<CustomProps, ShapeType, Res>;
+  function linkedComponent<
+    QueryType extends QueryBuilder<any> = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = GetQueryResponseType<QueryType>,
+  >(
+    arg1: any,
+    arg2?: any,
+    arg3?: LinkedComponentOptions,
   ): LinkedComponent<CustomProps, ShapeType, Res> {
+    const normalized = normalizeFactoryArgs<QueryType, CustomProps, ShapeType>(
+      arg1,
+      arg2,
+      arg3,
+    );
+    const query = normalized.query;
+    const functionalComponent =
+      normalized.component as LinkableComponent<CustomProps, ShapeType>;
+    const options = normalized.options;
+
     let [shapeClass, actualQuery] = processQuery<ShapeType>(query);
 
     let _wrappedComponent: LinkedComponent<CustomProps, ShapeType> =
@@ -175,6 +272,9 @@ export function createLinkedComponentFn(
         (props, ref) => {
           let [queryResult, setQueryResult] = useState<any>(undefined);
           let [loadingData, setLoadingData] = useState<string>();
+          let [queryError, setQueryError] = useState<Error | undefined>(
+            undefined,
+          );
 
           let linkedProps: any = getLinkedComponentProps<
             ShapeType,
@@ -183,6 +283,19 @@ export function createLinkedComponentFn(
           if (ref) {
             linkedProps.ref = ref;
           }
+
+          // Strip framework-only input props before forwarding to the
+          // wrapped component — `loader` / `errorElement` aren't part of
+          // the user's render contract.
+          const instanceLoader = (linkedProps as any).loader as
+            | React.ReactElement
+            | undefined;
+          const instanceErrorElement = (linkedProps as any).errorElement as
+            | React.ReactElement
+            | 'rethrow'
+            | undefined;
+          delete (linkedProps as any).loader;
+          delete (linkedProps as any).errorElement;
 
           const loadData = () => {
             const sourceId = linkedProps.source?.id;
@@ -193,16 +306,22 @@ export function createLinkedComponentFn(
                 : actualQuery;
 
               setLoadingData(sourceId || requestQuery.toJSON().subject);
-              getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
-                // Use empty object when result is null/undefined so the component
-                // renders with default values instead of showing spinner forever.
-                setQueryResult(result ?? {});
-                setLoadingData(null);
-              }).catch((err) => {
-                console.error('linkedComponent loadData failed:', err);
-                setQueryResult({});
-                setLoadingData(null);
-              });
+              setQueryError(undefined);
+              getQueryDispatch()
+                .selectQuery(requestQuery.build())
+                .then((result) => {
+                  // Use empty object when result is null/undefined so the
+                  // component renders with default values instead of
+                  // showing the loader forever.
+                  setQueryResult(result ?? {});
+                  setLoadingData(null);
+                })
+                .catch((err) => {
+                  setQueryError(
+                    err instanceof Error ? err : new Error(String(err)),
+                  );
+                  setLoadingData(null);
+                });
             } else {
               console.warn(
                 `Already loading data for source ${loadingData}, ignoring request`,
@@ -237,8 +356,8 @@ export function createLinkedComponentFn(
 
           if (!linkedProps.source && !resolvedSubjectId) {
             if (actualQuery.hasPendingContext()) {
-              // Subject will resolve after auth — show spinner until then.
-              return createLoadingSpinner();
+              // Subject will resolve after auth — show loader until then.
+              return resolveLoader(instanceLoader, options.loader);
             }
             console.warn(
               'This component requires a source to be provided (use the property "of"): ' +
@@ -253,11 +372,25 @@ export function createLinkedComponentFn(
             if (queryResult) {
               setQueryResult(undefined);
             }
+            if (queryError) {
+              setQueryError(undefined);
+            }
 
             if (usingStorage && !sourceIsValidQResult) {
               loadData();
             }
           }, [linkedProps.source?.id, resolvedSubjectId]);
+
+          if (queryError) {
+            const resolved = resolveErrorElement(
+              instanceErrorElement,
+              options.errorElement,
+            );
+            if (resolved === 'rethrow') {
+              throw queryError;
+            }
+            return resolved;
+          }
 
           let dataIsLoaded =
             queryResult || !usingStorage || sourceIsValidQResult;
@@ -266,7 +399,7 @@ export function createLinkedComponentFn(
           if (dataIsLoaded && typeof window !== 'undefined') {
             return React.createElement(functionalComponent, linkedProps);
           } else {
-            return createLoadingSpinner();
+            return resolveLoader(instanceLoader, options.loader);
           }
         },
       ) as any;
@@ -284,14 +417,16 @@ export function createLinkedComponentFn(
     registerComponent(_wrappedComponent, shapeClass);
 
     return _wrappedComponent;
-  };
+  }
+
+  return linkedComponent;
 }
 
 export function createLinkedSetComponentFn(
   registerPackageExport,
   registerComponent,
 ) {
-  return function linkedSetComponent<
+  function linkedSetComponent<
     QueryType extends
       | QueryBuilder<any>
       | {[key: string]: QueryBuilder<any>} = null,
@@ -304,7 +439,58 @@ export function createLinkedSetComponentFn(
       CustomProps & GetCustomObjectKeys<QueryType> & QueryControllerProps,
       ShapeType
     >,
+  ): LinkedSetComponent<CustomProps, ShapeType, Res>;
+  function linkedSetComponent<
+    QueryType extends
+      | QueryBuilder<any>
+      | {[key: string]: QueryBuilder<any>} = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = ToQueryResultSet<QueryType>,
+  >(
+    query: QueryType,
+    functionalComponent: LinkableSetComponent<
+      CustomProps & GetCustomObjectKeys<QueryType> & QueryControllerProps,
+      ShapeType
+    >,
+    options: LinkedComponentOptions,
+  ): LinkedSetComponent<CustomProps, ShapeType, Res>;
+  function linkedSetComponent<
+    QueryType extends
+      | QueryBuilder<any>
+      | {[key: string]: QueryBuilder<any>} = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = ToQueryResultSet<QueryType>,
+  >(
+    config: LinkedSetComponentConfig<
+      QueryType,
+      CustomProps & GetCustomObjectKeys<QueryType> & QueryControllerProps,
+      ShapeType
+    >,
+  ): LinkedSetComponent<CustomProps, ShapeType, Res>;
+  function linkedSetComponent<
+    QueryType extends
+      | QueryBuilder<any>
+      | {[key: string]: QueryBuilder<any>} = null,
+    CustomProps = {},
+    ShapeType extends Shape = GetQueryShapeType<QueryType>,
+    Res = ToQueryResultSet<QueryType>,
+  >(
+    arg1: any,
+    arg2?: any,
+    arg3?: LinkedComponentOptions,
   ): LinkedSetComponent<CustomProps, ShapeType, Res> {
+    const normalized = normalizeFactoryArgs<QueryType, CustomProps, ShapeType>(
+      arg1,
+      arg2,
+      arg3,
+    );
+    const query = normalized.query;
+    const functionalComponent =
+      normalized.component as LinkableSetComponent<CustomProps, ShapeType>;
+    const options = normalized.options;
+
     let [shapeClass, actualQuery] = processQuery<ShapeType>(query as any, true);
 
     let usingStorage = LinkedStorage.isInitialised();
@@ -315,6 +501,11 @@ export function createLinkedSetComponentFn(
         CustomProps & LinkedSetComponentInputProps<ShapeType>
       >((props, ref) => {
         let [queryResult, setQueryResult] = useState<any>(undefined);
+        let [queryError, setQueryError] = useState<Error | undefined>(
+          undefined,
+        );
+        // Bumped by `_refresh()` to force the load-effect to re-run.
+        let [refreshNonce, setRefreshNonce] = useState<number>(0);
 
         let linkedProps = getLinkedSetComponentProps<
           ShapeType,
@@ -328,6 +519,16 @@ export function createLinkedSetComponentFn(
         if (ref) {
           (linkedProps as any).ref = ref;
         }
+
+        const instanceLoader = (linkedProps as any).loader as
+          | React.ReactElement
+          | undefined;
+        const instanceErrorElement = (linkedProps as any).errorElement as
+          | React.ReactElement
+          | 'rethrow'
+          | undefined;
+        delete (linkedProps as any).loader;
+        delete (linkedProps as any).errorElement;
 
         let sourceIsValidQResult =
           Array.isArray(props.of) &&
@@ -376,6 +577,22 @@ export function createLinkedSetComponentFn(
           } as QueryController;
         }
 
+        (linkedProps as any)._refresh = useCallback(
+          (updatedProps?: any) => {
+            if (updatedProps) {
+              setQueryResult((current: any) =>
+                current ? {...current, ...updatedProps} : updatedProps,
+              );
+            } else {
+              // Bump the nonce so the load-effect refires even when
+              // props.of / limit / offset are unchanged.
+              setQueryError(undefined);
+              setRefreshNonce((n) => n + 1);
+            }
+          },
+          [],
+        );
+
         useEffect(() => {
           if (usingStorage && !sourceIsValidQResult) {
             // QueryBuilder is immutable — chain calls to set subjects, limit, offset.
@@ -392,11 +609,30 @@ export function createLinkedSetComponentFn(
               requestQuery = requestQuery.offset(offset);
             }
 
-            getQueryDispatch().selectQuery(requestQuery.build()).then((result) => {
-              setQueryResult(result);
-            });
+            setQueryError(undefined);
+            getQueryDispatch()
+              .selectQuery(requestQuery.build())
+              .then((result) => {
+                setQueryResult(result);
+              })
+              .catch((err) => {
+                setQueryError(
+                  err instanceof Error ? err : new Error(String(err)),
+                );
+              });
           }
-        }, [props.of, limit, offset]);
+        }, [props.of, limit, offset, refreshNonce]);
+
+        if (queryError) {
+          const resolved = resolveErrorElement(
+            instanceErrorElement,
+            options.errorElement,
+          );
+          if (resolved === 'rethrow') {
+            throw queryError;
+          }
+          return resolved;
+        }
 
         let dataIsLoaded = queryResult || !usingStorage || sourceIsValidQResult;
 
@@ -411,7 +647,7 @@ export function createLinkedSetComponentFn(
         if (dataIsLoaded) {
           return React.createElement(functionalComponent, linkedProps);
         } else {
-          return createLoadingSpinner();
+          return resolveLoader(instanceLoader, options.loader);
         }
       }) as any;
 
@@ -429,7 +665,9 @@ export function createLinkedSetComponentFn(
     registerComponent(_wrappedComponent, shapeClass);
 
     return _wrappedComponent;
-  };
+  }
+
+  return linkedSetComponent;
 }
 
 function getLinkedComponentProps<ShapeType extends Shape, P>(
@@ -572,13 +810,131 @@ function isValidSetQResult(qResults: QResult<any>[], query: QueryBuilder<any>): 
   return qResults.every((qResult) => isValidQResult(qResult, query));
 }
 
-function createLoadingSpinner() {
+/**
+ * Built-in loading element used when nothing higher in the resolution chain
+ * sets one. Renders an SVG ring; `stroke: currentColor` lets parent context
+ * tint it. Style via `.ld-loader` in `@_linked/css/loader.css`.
+ */
+function createDefaultLoader(): React.ReactElement {
   return React.createElement(
-    'div',
+    'svg',
     {
       className: 'ld-loader',
       'aria-label': 'Loading',
       role: 'status',
+      viewBox: '0 0 24 24',
+      xmlns: 'http://www.w3.org/2000/svg',
     },
+    React.createElement('circle', {
+      className: 'ld-loader__track',
+      cx: 12,
+      cy: 12,
+      r: 9,
+      fill: 'none',
+      stroke: 'currentColor',
+    }),
+    React.createElement('circle', {
+      className: 'ld-loader__arc',
+      cx: 12,
+      cy: 12,
+      r: 9,
+      fill: 'none',
+      stroke: 'currentColor',
+    }),
   );
+}
+
+/**
+ * Built-in error element used when a query rejects and nothing higher in the
+ * resolution chain handles it. Renders a small cross SVG; styled by
+ * `.ld-error` in `@_linked/css/error.css`.
+ */
+function createDefaultError(): React.ReactElement {
+  return React.createElement(
+    'svg',
+    {
+      className: 'ld-error',
+      'aria-label': 'Failed to load',
+      role: 'alert',
+      viewBox: '0 0 24 24',
+      xmlns: 'http://www.w3.org/2000/svg',
+    },
+    React.createElement('line', {
+      x1: 6,
+      y1: 6,
+      x2: 18,
+      y2: 18,
+      stroke: 'currentColor',
+    }),
+    React.createElement('line', {
+      x1: 18,
+      y1: 6,
+      x2: 6,
+      y2: 18,
+      stroke: 'currentColor',
+    }),
+  );
+}
+
+function resolveLoader(
+  instanceLoader: React.ReactElement | undefined,
+  definitionLoader: React.ReactElement | undefined,
+): React.ReactElement {
+  return (
+    instanceLoader ??
+    definitionLoader ??
+    LinkedComponentDefaults.loader ??
+    createDefaultLoader()
+  );
+}
+
+/**
+ * Resolves the error element. Returns either a React element to render, or
+ * the literal `'rethrow'` — callers must rethrow the captured error when
+ * they receive the sentinel.
+ */
+function resolveErrorElement(
+  instanceErrorElement: React.ReactElement | 'rethrow' | undefined,
+  definitionErrorElement: React.ReactElement | 'rethrow' | undefined,
+): React.ReactElement | 'rethrow' {
+  return (
+    instanceErrorElement ??
+    definitionErrorElement ??
+    LinkedComponentDefaults.errorElement ??
+    createDefaultError()
+  );
+}
+
+/**
+ * Normalizes the three factory signatures into a single shape:
+ *   (query, fn)                  -> { query, component: fn, options: {} }
+ *   (query, fn, options)         -> { query, component: fn, options }
+ *   ({ query, component, ... })  -> { query, component, options: { loader, errorElement } }
+ */
+function normalizeFactoryArgs<Q, P, S extends Shape>(
+  arg1: Q | LinkedComponentConfig<Q, P, S> | LinkedSetComponentConfig<Q, P, S>,
+  arg2?: LinkableComponent<P, S> | LinkableSetComponent<P, S>,
+  arg3?: LinkedComponentOptions,
+): {
+  query: Q;
+  component: LinkableComponent<P, S> | LinkableSetComponent<P, S>;
+  options: LinkedComponentOptions;
+} {
+  if (
+    arg2 === undefined &&
+    arg1 &&
+    typeof arg1 === 'object' &&
+    'component' in (arg1 as any) &&
+    'query' in (arg1 as any)
+  ) {
+    const config = arg1 as LinkedComponentConfig<Q, P, S> &
+      LinkedSetComponentConfig<Q, P, S>;
+    const {query, component, ...options} = config;
+    return {query, component, options};
+  }
+  return {
+    query: arg1 as Q,
+    component: arg2 as LinkableComponent<P, S> | LinkableSetComponent<P, S>,
+    options: arg3 ?? {},
+  };
 }

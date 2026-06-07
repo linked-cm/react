@@ -64,7 +64,7 @@ class BrokenLinkedClass extends LinkedComponentClass<Person> {
 }
 
 /**
- * A mock IQuadStore that returns configurable results.
+ * A mock IDataset that returns configurable results.
  * Tracks calls for assertions.
  */
 class MockStore {
@@ -112,7 +112,7 @@ let store: MockStore;
 
 beforeEach(() => {
   store = new MockStore();
-  LinkedStorage.setDefaultStore(store as any);
+  LinkedStorage.setDefaultDataset(store as any);
 });
 
 afterEach(() => {
@@ -295,15 +295,17 @@ describe('React component behavior', () => {
   });
 
   test('rejects when selectQuery is called without a configured store', async () => {
-    // Setting null store means selectQuery will reject
-    LinkedStorage.setDefaultStore(null as any);
+    // Setting null store means selectQuery will reject past the payload-shape
+    // validation. Use a minimally valid query payload (with `root`) so it
+    // reaches the no-store check rather than failing the structural guard.
+    LinkedStorage.setDefaultDataset(null as any);
 
     await expect(
-      LinkedStorage.selectQuery({} as any),
-    ).rejects.toThrow('No query store configured');
+      LinkedStorage.selectQuery({root: {}} as any),
+    ).rejects.toThrow('No query dataset configured');
 
     // Restore store for subsequent tests
-    LinkedStorage.setDefaultStore(store as any);
+    LinkedStorage.setDefaultDataset(store as any);
   });
 
   test('linkedSetComponent query controller methods update paging', async () => {
