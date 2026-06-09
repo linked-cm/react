@@ -112,7 +112,7 @@ let store: MockStore;
 
 beforeEach(() => {
   store = new MockStore();
-  LinkedStorage.setDefaultStore(store as any);
+  LinkedStorage.setDefaultDataset(store as any);
 });
 
 afterEach(() => {
@@ -331,13 +331,13 @@ describe('React component behavior', () => {
   test('rejects invalid selectQuery payloads before store resolution', async () => {
     // React depends only on the call rejecting; the exact error comes from
     // @_linked/core and may vary by installed core patch level.
-    LinkedStorage.setDefaultStore(null as any);
+    LinkedStorage.setDefaultDataset(null as any);
 
     await expect(LinkedStorage.selectQuery({} as any)).rejects.toThrow(
       /Invalid select query passed to LinkedStorage\.selectQuery\(\): missing root|No query store configured\. Call LinkedStorage\.setDefaultStore\(\)\./,
     );
 
-    LinkedStorage.setDefaultStore(store as any);
+    LinkedStorage.setDefaultDataset(store as any);
   });
 
   test('linkedSetComponent query controller methods update paging', async () => {
