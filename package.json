@@ -17,11 +17,13 @@
   "exports": {
     ".": {
       "types": "./lib/esm/index.d.ts",
+      "development": "./src/index.ts",
       "import": "./lib/esm/index.js",
       "require": "./lib/cjs/index.js"
     },
     "./*": {
       "types": "./lib/esm/*.d.ts",
+      "development": "./src/*.ts",
       "import": "./lib/esm/*.js",
       "require": "./lib/cjs/*.js"
     }
