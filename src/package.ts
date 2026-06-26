@@ -48,13 +48,13 @@ const linkedSetComponent = createLinkedSetComponentFn(
   registerPackageExport,
   registerComponent,
 );
-export const linkedPackage = (packageName) => {
+export const linkedPackage = (packageName: string) => {
   return {
     linkedComponent,
     linkedSetComponent,
-    ...linkedPackage(packageName)
-  }
-}
+    ...coreLinkedPackage(packageName),
+  };
+};
 
 export {
   linkedComponent,
