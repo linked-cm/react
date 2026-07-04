@@ -308,7 +308,7 @@ export function createLinkedComponentFn(
               setLoadingData(sourceId || requestQuery.toJSON().subject);
               setQueryError(undefined);
               getQueryDispatch()
-                .selectQuery(requestQuery.build())
+                .selectQuery(requestQuery)
                 .then((result) => {
                   // Use empty object when result is null/undefined so the
                   // component renders with default values instead of
@@ -611,7 +611,7 @@ export function createLinkedSetComponentFn(
 
             setQueryError(undefined);
             getQueryDispatch()
-              .selectQuery(requestQuery.build())
+              .selectQuery(requestQuery)
               .then((result) => {
                 setQueryResult(result);
               })
