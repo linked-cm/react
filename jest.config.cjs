@@ -1,17 +1,21 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
+/** @type {import('ts-jest/dist/types').JestConfigWithTsJest} */
 module.exports = {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
   rootDir: 'src/tests',
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transform: {
     '^.+\\.(ts|tsx)$': [
       'ts-jest',
       {
+        useESM: true,
         tsconfig: '<rootDir>/../../tsconfig-test.json',
       },
     ],
   },
+  // Strip the `.js` extension from relative ESM imports so ts-jest resolves the
+  // `.ts` source (NodeNext-style specifiers carry `.js`; jest maps back to src).
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@_linked/react/(.*)$': '<rootDir>/../$1',

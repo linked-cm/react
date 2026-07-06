@@ -1,5 +1,5 @@
 /**
- * @jest-environment ./jest-environment-jsdom-with-fetch.js
+ * @jest-environment ./jest-environment-jsdom-with-fetch.cjs
  *
  * Integration tests for React linked components backed by a real Fuseki store.
  *
