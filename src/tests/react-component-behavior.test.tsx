@@ -64,7 +64,7 @@ class BrokenLinkedClass extends LinkedComponentClass<Person> {
 }
 
 /**
- * A mock IQuadStore that returns configurable results.
+ * A mock IDataset that returns configurable results.
  * Tracks calls for assertions.
  */
 class MockStore {
@@ -328,15 +328,17 @@ describe('React component behavior', () => {
     ).toThrow('Unknown data query type');
   });
 
-  test('rejects invalid selectQuery payloads before store resolution', async () => {
-    // React depends only on the call rejecting; the exact error comes from
-    // @_linked/core and may vary by installed core patch level.
+  test('rejects when selectQuery is called without a configured store', async () => {
+    // Setting null store means selectQuery will reject past the payload-shape
+    // validation. Use a minimally valid query payload (with `root`) so it
+    // reaches the no-store check rather than failing the structural guard.
     LinkedStorage.setDefaultDataset(null as any);
 
-    await expect(LinkedStorage.selectQuery({} as any)).rejects.toThrow(
-      /Invalid select query passed to LinkedStorage\.selectQuery\(\): missing root|No query store configured\. Call LinkedStorage\.setDefaultStore\(\)\./,
-    );
+    await expect(
+      LinkedStorage.selectQuery({root: {}} as any),
+    ).rejects.toThrow('No query dataset configured');
 
+    // Restore store for subsequent tests
     LinkedStorage.setDefaultDataset(store as any);
   });
 

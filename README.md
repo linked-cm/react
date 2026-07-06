@@ -4,6 +4,8 @@ React bindings for `@_linked/core`.
 
 `@_linked/react` takes a Linked query from `@_linked/core`'s [Schema-Parameterized Query DSL](../core/README.md#schema-parameterized-query-dsl) and maps the top-level query result keys to props for a React component.
 
+> **Query API note.** Queries are built with `Shape.select(...)` which returns a `QueryBuilder`. A `QueryBuilder` is **lazy** — it only fires when you `await` it or pass it through `linkedComponent` / `linkedSetComponent`. The old `Shape.query(...)` builder name is gone; use `.select(...)` everywhere.
+
 This package provides:
 - `linkedComponent(...)`
 - `linkedSetComponent(...)`
@@ -30,11 +32,11 @@ import {
 
 ### `linkedComponent(...)`
 
-`linkedComponent(...)` wraps a React component with a Linked query. You pass a query built with `Shape.query(...)` (which prepares query execution), not `Shape.select(...)` (which executes immediately). At render time, when you pass `of={{id: ...}}`, the wrapper applies the prepared query to that subject and injects the query result keys as props into your component.
+`linkedComponent(...)` wraps a React component with a Linked query. You pass a query built with `Shape.select(...)` — the returned `QueryBuilder` is lazy and the wrapper fires it at render time. When you pass `of={{id: ...}}`, the wrapper applies the prepared query to that subject and injects the query result keys as props into your component.
 
 ```tsx
 const PersonCard = linkedComponent(
-  Person.query((p) => p.name),
+  Person.select((p) => p.name),
   ({name, source, _refresh}) => (
     <article>
       <h3>{name}</h3>
@@ -66,7 +68,7 @@ Example use case: optimistic UI after a mutation.
 
 ```tsx
 const PersonCard = linkedComponent(
-  Person.query((p) => [p.name, p.active]),
+  Person.select((p) => [p.name, p.active]),
   ({id, name, active, _refresh, title}) => (
     <div>
       <h4>{title}</h4>
@@ -95,7 +97,7 @@ Use `linkedSetComponent(...)` when you want to render a list of sources.
 
 ```tsx
 const NameList = linkedSetComponent(
-  Person.query((p) => p.name),
+  Person.select((p) => p.name),
   ({linkedData}) => (
     <ul>
       {(linkedData || []).map((person) => (
@@ -109,7 +111,7 @@ const NameList = linkedSetComponent(
 ### `linkedSetComponent(...)` (named data-prop format)
 
 ```tsx
-const personQuery = Person.query((p) => [p.name, p.hobby]);
+const personQuery = Person.select((p) => [p.name, p.hobby]);
 
 const NameList = linkedSetComponent({persons: personQuery}, ({persons}) => (
   <ul>
@@ -153,7 +155,7 @@ Example:
 import React from 'react';
 
 const PeopleList = linkedSetComponent(
-  Person.query((p) => [p.name]).limit(5),
+  Person.select((p) => [p.name]).limit(5),
   ({linkedData = [], query}) => {
     const [page, setPage] = React.useState(0);
 
