@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- [#23](https://github.com/linked-cm/react/pull/23) [`b436d21`](https://github.com/linked-cm/react/commit/b436d21eccd4241b208e60dae1e25524783d1f2c) Thanks [@flyon](https://github.com/flyon)! - ESM-only build + core 2.10.x compatibility fix.
+
+  - **`.build()` removal:** the client preload path in `LinkedComponent` called
+    `getQueryDispatch().selectQuery(requestQuery.build())`. `QueryBuilder.build()`
+    was removed in `@_linked/core` 2.10.x — datasets now receive the live/closed
+    query directly. Both the single and set component paths now pass `requestQuery`
+    straight to `selectQuery`. Required for consumers on core ≥ 2.10.x.
+  - **ESM-only:** the package now ships ESM only. `package.json` gains
+    `"type": "module"`, `main`/`module`/`types` point at `lib/esm`, and every
+    `require` condition is dropped from `exports`. The dual (CJS+ESM) build and the
+    `dual-package` post-step are removed; `build` is a single `tsc -p tsconfig-esm.json`.
+
 ## 1.3.1
 
 ### Patch Changes
