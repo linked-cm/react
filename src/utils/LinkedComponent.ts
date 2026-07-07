@@ -1,10 +1,6 @@
 import {
-  GetCustomObjectKeys,
   QResult,
-  QueryController,
-  QueryControllerProps,
   QueryResponseToResultType,
-  ToQueryResultSet,
 } from '@_linked/core/queries/SelectQuery';
 import {Shape} from '@_linked/core/shapes/Shape';
 import {QueryBuilder} from '@_linked/core/queries/QueryBuilder';
@@ -38,6 +34,32 @@ type GetQueryResponseType<Q> =
 type QueryWrapperObject<ShapeType extends Shape = any> = {
   [key: string]: QueryBuilder<ShapeType>;
 };
+
+/**
+ * Query-driven-component types — react-local. Core removed these from
+ * SelectQuery as "dead" (commit 5ace0cf), but only react used them; they live
+ * here now, same as `GetQueryResponseType`/`QueryWrapperObject` above.
+ */
+type QueryController = {
+  nextPage: () => void;
+  previousPage: () => void;
+  setLimit: (limit: number) => void;
+  setPage: (page: number) => void;
+};
+type QueryControllerProps = {
+  query?: QueryController;
+};
+type ToQueryResultSet<T> =
+  T extends FieldSet<infer ResponseType, any>
+    ? QueryResponseToResultType<ResponseType>[]
+    : null;
+type GetCustomObjectKeys<T> = T extends QueryWrapperObject
+  ? {
+      [P in keyof T]: T[P] extends FieldSet<any, any>
+        ? ToQueryResultSet<T[P]>
+        : never;
+    }
+  : [];
 
 type ProcessDataResultType<ShapeType extends Shape> = [
   typeof Shape,
