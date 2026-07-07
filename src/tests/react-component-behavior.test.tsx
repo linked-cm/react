@@ -176,6 +176,40 @@ describe('React component behavior', () => {
     });
   });
 
+  test('linkedSetComponent handles rejected query execution without hanging', async () => {
+    const deferred = Promise.reject(new Error('boom'));
+    deferred.catch(() => {});
+    store.queueResult(deferred);
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const NameList = linkedSetComponent(
+      Person.select((p) => p.name),
+      ({linkedData = []}) => (
+        <ul aria-label="names">
+          {linkedData.map((item) => (
+            <li key={item.id}>{item.name}</li>
+          ))}
+        </ul>
+      ),
+    );
+
+    render(<NameList />);
+
+    expect(screen.getByRole('status', {name: 'Loading'})).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('names')).toBeTruthy();
+    });
+
+    expect(screen.queryByRole('status', {name: 'Loading'})).toBeNull();
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      'linkedSetComponent loadData failed:',
+      expect.any(Error),
+    );
+  });
+
   test('_refresh() refetches data and rerenders', async () => {
     let singleValue = 'Semmy';
     store.setSingleResult({id: 'urn:test:gap:p1', name: singleValue});
