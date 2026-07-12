@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1
+
+### Patch Changes
+
+- [#26](https://github.com/linked-cm/react/pull/26) [`c7d61ff`](https://github.com/linked-cm/react/commit/c7d61ff7c72874e18b657dc54886b11cbdd814ce) Thanks [@flyon](https://github.com/flyon)! - Fix build against current `@_linked/core`: define the query-driven-component types (`QueryController`, `QueryControllerProps`, `ToQueryResultSet`, `GetCustomObjectKeys`) locally instead of importing them from `@_linked/core/queries/SelectQuery`, where core removed them as "dead" (only react used them; same pattern as the already-local `GetQueryResponseType`/`QueryWrapperObject`). Bump the `@_linked/core` peer to `^2.13`. Also drops the dead `development` export condition.
+
 ## 1.4.0
 
 ### Minor Changes

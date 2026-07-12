@@ -1,6 +1,6 @@
 {
   "name": "@_linked/react",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "license": "MIT",
   "linkedPackage": true,
   "type": "module",
@@ -51,7 +51,6 @@
     "react": "^18.2.0"
   },
   "dependencies": {
-    "classnames": "^2.5.1",
     "react-usestateref": "^1.0.8"
   },
   "devDependencies": {
