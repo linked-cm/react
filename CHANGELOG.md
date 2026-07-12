@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2
+
+### Patch Changes
+
+- [#31](https://github.com/linked-cm/react/pull/31) [`efed05e`](https://github.com/linked-cm/react/commit/efed05ec8bfe539dd718344e5fd3c7508312705e) Thanks [@flyon](https://github.com/flyon)! - `classnames` is now inlined (the `cl` helper's API is unchanged) and the external `classnames` dependency is dropped. The external package is CJS and broke native-ESM standalone bundles; consumers already import `cl` from `@_linked/react/utils/ClassNames`, so no change is needed on their side.
+
 ## 1.4.1
 
 ### Patch Changes
