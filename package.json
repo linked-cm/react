@@ -1,6 +1,6 @@
 {
   "name": "@_linked/react",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "license": "MIT",
   "linkedPackage": true,
   "type": "module",
@@ -44,7 +44,8 @@
   "scripts": {
     "build": "npx rimraf ./lib && npx tsc -p tsconfig-esm.json",
     "compile": "echo '💫 Compiling ESM' && npx tsc -p tsconfig-esm.json",
-    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest --config jest.config.cjs"
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest --config jest.config.cjs",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules npx jest --config jest.config.cjs react-component-integration --testPathIgnorePatterns="
   },
   "peerDependencies": {
     "@_linked/core": "^2.10",
