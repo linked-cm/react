@@ -36,9 +36,9 @@ import {setQueryContext} from '@_linked/core/queries/QueryContext';
 // SHACL-generated shape URIs (must match what the SPARQL pipeline uses)
 // ---------------------------------------------------------------------------
 
-const P = 'https://data.lincd.org/module/-_linked-core/shape/person';
-const D = 'https://data.lincd.org/module/-_linked-core/shape/dog';
-const PET = 'https://data.lincd.org/module/-_linked-core/shape/pet';
+const P = 'https://linked.cm/shape/core/Person';
+const D = 'https://linked.cm/shape/core/Dog';
+const PET = 'https://linked.cm/shape/core/Pet';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';
 const ENT = tmpEntityBase;
