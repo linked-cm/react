@@ -5,8 +5,6 @@ import {
 import {Shape} from '@_linked/core/shapes/Shape';
 import {QueryBuilder} from '@_linked/core/queries/QueryBuilder';
 import {FieldSet} from '@_linked/core/queries/FieldSet';
-import {getQueryDispatch} from '@_linked/core/queries/queryDispatch';
-
 import React, {useCallback, useEffect, useState} from 'react';
 import {LinkedStorage} from '@_linked/core/utils/LinkedStorage';
 import {DEFAULT_LIMIT} from '@_linked/core/utils/Package';

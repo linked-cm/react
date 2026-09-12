@@ -21,16 +21,14 @@ import {
   tmpEntityBase,
 } from '@_linked/core/test-helpers/query-fixtures';
 import {
-  ensureFuseki,
-  stopFuseki,
   createTestDataset,
   deleteTestDataset,
   loadTestData,
   clearAllData,
-  FUSEKI_BASE_URL,
 } from '@_linked/core/test-helpers/fuseki-test-store';
 import {FusekiStore} from '@_linked/core/test-helpers/FusekiStore';
 import {setQueryContext} from '@_linked/core/queries/QueryContext';
+import {ensureFuseki, stopFuseki, FUSEKI_BASE_URL} from './fuseki-runtime';
 
 // ---------------------------------------------------------------------------
 // SHACL-generated shape URIs (must match what the SPARQL pipeline uses)
