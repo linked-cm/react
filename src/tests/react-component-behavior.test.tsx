@@ -265,7 +265,10 @@ describe('React component behavior', () => {
   });
 
   test('throws on invalid linkedSetComponent input prop type', () => {
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    // Silences React's error logging for the thrown render. React 18 reported
+    // it via console.error; React 19 reports uncaught render errors through
+    // window.reportError instead, so the spy is not asserted on.
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     const NameList = linkedSetComponent(
       Person.select((p) => p.name),
       ({linkedData = []}) => (
@@ -280,7 +283,6 @@ describe('React component behavior', () => {
     expect(() =>
       render(React.createElement(NameList, {of: {id: 'urn:test:gap:p1'}} as any)),
     ).toThrow("Invalid argument 'of' provided");
-    expect(errorSpy).toHaveBeenCalled();
   });
 
   test('throws on invalid query-wrapper object formats', () => {
