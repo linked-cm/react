@@ -18,6 +18,26 @@ This package provides:
 npm install @_linked/react @_linked/core react react-dom
 ```
 
+Supports React 18 (`^18.2.0`) and React 19 (`^19.0.0`).
+
+## React Native
+
+Import from the `@_linked/react/native` subpath instead of the root:
+
+```tsx
+import {linkedComponent, linkedSetComponent, linkedShape} from '@_linked/react/native';
+```
+
+It exports the same API as `@_linked/react` (the same objects, not copies). Importing it also sets React Native render defaults, because the built-in loader and error elements are `<svg>` elements, and those crash on React Native:
+
+- `LinkedComponentDefaults.loader`: `<ActivityIndicator testID="linked-loader" />`
+- `LinkedComponentDefaults.errorElement`: `<Text testID="linked-error" accessibilityRole="alert">Failed to load</Text>`
+- `LinkedInfinityLoader` renders the same `ActivityIndicator`
+
+It sets a default only when your app hasn't already set it. Instance props and definition options still take precedence as usual. Use the subpath for at least the first `@_linked/react` import your app evaluates, for example in `App.tsx`.
+
+`react-native` (`>=0.76`) is an optional peer dependency. The root entry never imports it, so web apps don't install it and get no peer warning.
+
 ## Usage
 
 ### Setup package exports
