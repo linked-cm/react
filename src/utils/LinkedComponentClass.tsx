@@ -1,6 +1,6 @@
 import React from 'react';
 import {Shape} from '@_linked/core/shapes/Shape';
-import {LinkedComponentProps} from './LinkedComponent.js';
+import type {LinkedComponentProps} from './LinkedComponent.js';
 
 /**
  * Class component base for linked components.

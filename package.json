@@ -1,29 +1,28 @@
 {
   "name": "@_linked/react",
-  "version": "1.2.1",
+  "version": "1.5.0",
   "license": "MIT",
   "linkedPackage": true,
+  "type": "module",
   "description": "React bindings for @_linked/core",
   "sideEffects": [
-    "./lib/cjs/package.js",
     "./lib/esm/package.js"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Semantu/linked-react.git"
+    "url": "git+https://github.com/linked-cm/react.git"
   },
-  "main": "lib/cjs/index.js",
+  "main": "lib/esm/index.js",
   "module": "lib/esm/index.js",
+  "types": "./lib/esm/index.d.ts",
   "exports": {
     ".": {
       "types": "./lib/esm/index.d.ts",
-      "import": "./lib/esm/index.js",
-      "require": "./lib/cjs/index.js"
+      "import": "./lib/esm/index.js"
     },
     "./*": {
       "types": "./lib/esm/*.d.ts",
-      "import": "./lib/esm/*.js",
-      "require": "./lib/cjs/*.js"
+      "import": "./lib/esm/*.js"
     }
   },
   "typesVersions": {
@@ -43,34 +42,41 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npx rimraf ./lib && npx tsc -p tsconfig-cjs.json && npx tsc -p tsconfig-esm.json && node ./scripts/dual-package.js",
-    "compile": "echo '💫 Compiling CJS' && npx tsc -p tsconfig-cjs.json && echo '💫 Compiling ESM' && npx tsc -p tsconfig-esm.json",
-    "dual-package": "node ./scripts/dual-package.js",
-    "test": "npx jest --config jest.config.js"
+    "build": "npx rimraf ./lib && npx tsc -p tsconfig-esm.json",
+    "compile": "echo '💫 Compiling ESM' && npx tsc -p tsconfig-esm.json",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest --config jest.config.cjs",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules npx jest --config jest.config.cjs react-component-integration --testPathIgnorePatterns="
   },
   "peerDependencies": {
-    "@_linked/core": "^2.2.3",
-    "react": "^18.2.0"
+    "@_linked/core": "^2.10",
+    "react": "^18.2.0 || ^19.0.0",
+    "react-native": ">=0.76"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
   },
   "dependencies": {
-    "classnames": "^2.5.1",
     "react-usestateref": "^1.0.8"
   },
   "devDependencies": {
-    "@_linked/core": "^2.2.3",
+    "@_linked/core": "^2.10",
     "@_linked/rdf-mem-store": "^1.0.0",
     "@changesets/changelog-github": "^0.5.2",
     "@changesets/cli": "^2.29.8",
     "@jest/globals": "^29.7.0",
-    "@testing-library/react": "^14.2.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.12.7",
-    "@types/react": "^18.2.61",
-    "@types/react-dom": "^18.2.19",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-native": "0.86.3",
     "rimraf": "^5.0.7",
     "ts-jest": "^29.1.2",
     "typescript": "^5.7.3"

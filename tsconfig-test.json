@@ -5,7 +5,8 @@
     "moduleResolution": "bundler",
     "paths": {
       "@_linked/react": ["./src/index"],
-      "@_linked/react/*": ["./src/*"]
+      "@_linked/react/*": ["./src/*"],
+      "@_linked/core/test-helpers/*": ["../core/src/test-helpers/*"]
     }
   },
   "include": [

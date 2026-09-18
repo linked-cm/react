@@ -2,7 +2,7 @@ import {CoreSet} from '@_linked/core/collections/CoreSet';
 import {linkedPackage as coreLinkedPackage} from '@_linked/core/utils/Package';
 import {Shape} from '@_linked/core/shapes/Shape';
 import {
-  Component,
+  type Component,
   createLinkedComponentFn,
   createLinkedSetComponentFn,
 } from './utils/LinkedComponent.js';
@@ -48,13 +48,13 @@ const linkedSetComponent = createLinkedSetComponentFn(
   registerPackageExport,
   registerComponent,
 );
-export const linkedPackage = (packageName) => {
+export const linkedPackage = (packageName: string) => {
   return {
     linkedComponent,
     linkedSetComponent,
-    ...linkedPackage(packageName)
-  }
-}
+    ...coreLinkedPackage(packageName),
+  };
+};
 
 export {
   linkedComponent,

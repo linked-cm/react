@@ -88,22 +88,27 @@ class MockStore {
   }
 
   async selectQuery(query: any): Promise<any> {
+    const json = typeof query?.toJSON === 'function' ? query.toJSON() : query;
+    // A subject-bound query (`.for(id)`) is inherently single-result; on the
+    // serialized form that shows up as a `subject` even when the explicit
+    // `singleResult` flag isn't emitted.
+    const isSingle = json.singleResult || json.subject != null;
     this.calls.push({
-      offset: query.offset,
-      limit: query.limit,
-      singleResult: query.singleResult,
+      offset: json.offset,
+      limit: json.limit,
+      singleResult: isSingle,
     });
 
     if (this.queue.length > 0) {
       return this.queue.shift();
     }
 
-    if (query.singleResult) {
+    if (isSingle) {
       return this.singleResult;
     }
 
-    const offset = query.offset || 0;
-    const limit = query.limit || this.setResult.length;
+    const offset = json.offset || 0;
+    const limit = json.limit || this.setResult.length;
     return this.setResult.slice(offset, offset + limit);
   }
 }
@@ -260,7 +265,10 @@ describe('React component behavior', () => {
   });
 
   test('throws on invalid linkedSetComponent input prop type', () => {
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    // Silences React's error logging for the thrown render. React 18 reported
+    // it via console.error; React 19 reports uncaught render errors through
+    // window.reportError instead, so the spy is not asserted on.
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     const NameList = linkedSetComponent(
       Person.select((p) => p.name),
       ({linkedData = []}) => (
@@ -275,7 +283,6 @@ describe('React component behavior', () => {
     expect(() =>
       render(React.createElement(NameList, {of: {id: 'urn:test:gap:p1'}} as any)),
     ).toThrow("Invalid argument 'of' provided");
-    expect(errorSpy).toHaveBeenCalled();
   });
 
   test('throws on invalid query-wrapper object formats', () => {
@@ -296,12 +303,12 @@ describe('React component behavior', () => {
 
   test('rejects when selectQuery is called without a configured store', async () => {
     // Setting null store means selectQuery will reject past the payload-shape
-    // validation. Use a minimally valid query payload (with `root`) so it
-    // reaches the no-store check rather than failing the structural guard.
+    // validation. Provide a `shape` so the payload passes the shape guard added
+    // in core 2.14.4 and reaches the no-store check.
     LinkedStorage.setDefaultDataset(null as any);
 
     await expect(
-      LinkedStorage.selectQuery({root: {}} as any),
+      LinkedStorage.selectQuery({shape: {id: 'urn:test-shape'}} as any),
     ).rejects.toThrow('No query dataset configured');
 
     // Restore store for subsequent tests
